@@ -1,0 +1,45 @@
+ble:
+  hci: 0
+
+storage:
+  path: "/var/lib/blevaettir/data.db"
+
+intervals:
+  scan_interval_sec: 30
+
+log:
+  level: "info"
+
+handlers:
+  - type: "db"
+    db:
+      enabled: true
+
+  - type: "http"
+    http:
+      enabled: false
+      endpoint: "http://localhost:8080/api/sensors"
+      api_key: ""
+
+  - type: "log"
+
+unknown_objects:
+  enabled: true
+  handlers:
+    - type: "log"
+
+ble_objects:
+  - name: "Kitchen Thermometer"
+    mac: "A4:C1:38:12:34:56"
+    parsers:
+      - type: "xiaomi_lywsd03mmc"
+    handlers:
+      - type: "db"
+
+  - name: "Living Room"
+    mac: "A4:C1:38:AB:CD:EF"
+    parsers:
+      - type: "atc_thermometer"
+    handlers:
+      - type: "db"
+      - type: "http"

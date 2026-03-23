@@ -30,3 +30,10 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# Local binaries
+bin/
+
+# Database files
+*.db
+/blevaettir.yaml
