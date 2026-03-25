@@ -26,7 +26,14 @@ handlers:
 unknown_objects:
   enabled: true
   handlers:
-    - type: "log"
+  - type: "log"
+
+  - type: "narodmon"
+    narodmon:
+      enabled: false
+      endpoint: "http://narodmon.com/post"
+      device_id: "your_device_id"
+      device_mac: "AA:BB:CC:DD:EE:FF"
 
 ble_objects:
   - name: "Kitchen Thermometer"

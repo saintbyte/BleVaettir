@@ -29,6 +29,7 @@ type StorageConfig struct {
 }
 
 type IntervalsConfig struct {
+	ScanDurationSec int `yaml:"scan_duration_sec"`
 	ScanIntervalSec int `yaml:"scan_interval_sec"`
 }
 
@@ -53,9 +54,18 @@ type ObjectHandler struct {
 }
 
 type HandlerConfig struct {
-	Type string             `yaml:"type"`
-	DB   *DBHandlerConfig   `yaml:"db,omitempty"`
-	HTTP *HTTPHandlerConfig `yaml:"http,omitempty"`
+	Type     string                 `yaml:"type"`
+	DB       *DBHandlerConfig       `yaml:"db,omitempty"`
+	HTTP     *HTTPHandlerConfig     `yaml:"http,omitempty"`
+	Narodmon *NarodmonHandlerConfig `yaml:"narodmon,omitempty"`
+}
+
+type NarodmonHandlerConfig struct {
+	Enabled bool   `yaml:"enabled"`
+	Owner   string `yaml:"owner"`
+	Lat     string `yaml:"lat"`
+	Lon     string `yaml:"lon"`
+	Alt     string `yaml:"alt"`
 }
 
 type DBHandlerConfig struct {

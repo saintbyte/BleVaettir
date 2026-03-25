@@ -144,6 +144,10 @@ func buildGlobalHandlers(handlerCfgs []config.HandlerConfig, store *storage.Stor
 			if h.HTTP != nil && h.HTTP.Enabled {
 				handlers = append(handlers, handler.NewHTTPHandler(h.HTTP.Endpoint, h.HTTP.APIKey))
 			}
+		case "narodmon":
+			if h.Narodmon != nil && h.Narodmon.Enabled {
+				handlers = append(handlers, handler.NewNarodmonHandler(h.Narodmon.Endpoint, h.Narodmon.DeviceID, h.Narodmon.DeviceMAC))
+			}
 		case "log":
 			handlers = append(handlers, handler.NewLogHandler())
 		}
@@ -164,6 +168,10 @@ func buildHandlerMap(handlerCfgs []config.HandlerConfig, store *storage.Storage)
 		case "http":
 			if h.HTTP != nil && h.HTTP.Enabled {
 				result["http"] = handler.NewHTTPHandler(h.HTTP.Endpoint, h.HTTP.APIKey)
+			}
+		case "narodmon":
+			if h.Narodmon != nil && h.Narodmon.Enabled {
+				result["narodmon"] = handler.NewNarodmonHandler()
 			}
 		case "log":
 			result["log"] = handler.NewLogHandler()

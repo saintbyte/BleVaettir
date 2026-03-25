@@ -140,6 +140,7 @@ ble_objects:
 |-----|----------|--------|
 | `xiaomi_lywsd03mmc` | Xiaomi LYWSD03MMC | temperature, humidity |
 | `atc_thermometer` | ATC/BLE термометры | temperature, humidity |
+| `jaalee` | Jaalée датчика  |  temperature, humidity, battery, rssi |
 | `raw` | Сырые данные | raw (первый байт) |
 
 #### Xiaomi LYWSD03MMC
@@ -161,6 +162,19 @@ parsers:
 Выводит:
 - `temperature` - температура (°C)
 - `humidity` - влажность (%)
+
+#### Jaalee Thermometer
+
+```yaml
+parsers:
+  - type: "jaalee"
+```
+Выводит:
+- `temperature` - температура (°C)
+- `humidity` - влажность (%)
+- `battery` - батарея
+- `rssi` - уровень сигнала
+
 
 #### Raw
 

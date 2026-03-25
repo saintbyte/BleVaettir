@@ -3,8 +3,8 @@ package scanner
 import (
 	"context"
 	"fmt"
+	"github.com/pkg/errors"
 	"log/slog"
-	"sync"
 	"time"
 
 	"github.com/saintbyte/BleVaettir/internal/config"
@@ -63,34 +63,42 @@ func (s *Scanner) Run(stop <-chan struct{}) {
 		}
 	}
 }
+func (s *Scanner) advHandler(a ble.Advertisement) {
+	mac := a.Addr().String()
+	if obj, ok := s.objectMap[mac]; ok {
+		s.handleObject(a, obj)
+	} else if len(s.unknownHandlers) > 0 {
+		s.handleUnknown(a, mac)
+	}
+}
 
-func (s *Scanner) scan() {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(s.cfg.Intervals.ScanIntervalSec)*time.Second)
-	defer cancel()
-
-	seen := make(map[string]bool)
-	var mu sync.Mutex
-
-	err := ble.Scan(ctx, false, func(a ble.Advertisement) {
-		mac := a.Addr().String()
-
-		mu.Lock()
-		if seen[mac] {
-			mu.Unlock()
-			return
-		}
-		seen[mac] = true
-		mu.Unlock()
-
-		if obj, ok := s.objectMap[mac]; ok {
-			s.handleObject(a, obj)
-		} else if len(s.unknownHandlers) > 0 {
-			s.handleUnknown(a, mac)
-		}
-	}, nil)
-	if err != nil && ctx.Err() == nil {
+func (s *Scanner) chkErr(err error) {
+	switch errors.Cause(err) {
+	case nil:
+		s.scanDone() // Todo
+	case context.DeadlineExceeded:
+		s.scanDone()
+	case context.Canceled:
+		s.scanCanceled()
+	default:
 		slog.Warn("BLE scan error", "error", err)
 	}
+}
+
+func (s *Scanner) scanDone() {
+	slog.Debug("Done scanning BLE devices.")
+	ble.Stop()
+}
+
+func (s *Scanner) scanCanceled() {
+	slog.Debug("Canelled scanning BLE devices.")
+	ble.Stop()
+}
+
+func (s *Scanner) scan() {
+	ctx := ble.WithSigHandler(context.WithTimeout(context.Background(), time.Duration(s.cfg.Intervals.ScanDurationSec)*time.Second))
+	defer ble.Stop()
+	s.chkErr(ble.Scan(ctx, false, s.advHandler, nil))
 }
 
 func (s *Scanner) handleObject(a ble.Advertisement, obj *config.BLEObjectConfig) {
@@ -145,6 +153,8 @@ func (s *Scanner) parseAdvertisement(a ble.Advertisement, obj *config.BLEObjectC
 			readings = append(readings, parseXiaomiLYWSD(data, obj, now)...)
 		case "atc_thermometer":
 			readings = append(readings, parseATC(data, obj, now)...)
+		case "jaalee":
+			readings = append(readings, parseJaalee(data, obj, now)...)
 		case "raw":
 			readings = append(readings, parseRaw(data, obj, now)...)
 		default:
@@ -153,70 +163,6 @@ func (s *Scanner) parseAdvertisement(a ble.Advertisement, obj *config.BLEObjectC
 	}
 
 	return readings
-}
-
-func parseXiaomiLYWSD(data []byte, obj *config.BLEObjectConfig, t time.Time) []handler.Reading {
-	if len(data) < 6 || data[0] != 0x58 || data[1] != 0x4C {
-		return nil
-	}
-	return []handler.Reading{
-		{
-			SensorMAC:  obj.MAC,
-			SensorName: obj.Name,
-			Type:       "temperature",
-			Value:      float64(int16(data[4])<<8|int16(data[3])) / 100.0,
-			Unit:       "°C", Timestamp: t,
-		},
-		{
-			SensorMAC:  obj.MAC,
-			SensorName: obj.Name,
-			Type:       "humidity",
-			Value:      float64(data[5]),
-			Unit:       "%",
-			Timestamp:  t,
-		},
-	}
-}
-
-func parseATC(data []byte, obj *config.BLEObjectConfig, t time.Time) []handler.Reading {
-	if len(data) < 10 {
-		return nil
-	}
-	return []handler.Reading{
-		{
-			SensorMAC:  obj.MAC,
-			SensorName: obj.Name,
-			Type:       "temperature",
-			Value:      float64(int16(data[8])<<8|int16(data[7])) / 100.0,
-			Unit:       "°C",
-			Timestamp:  t,
-		},
-		{
-			SensorMAC:  obj.MAC,
-			SensorName: obj.Name,
-			Type:       "humidity",
-			Value:      float64(data[9]),
-			Unit:       "%",
-			Timestamp:  t,
-		},
-	}
-}
-
-func parseRaw(data []byte, obj *config.BLEObjectConfig, t time.Time) []handler.Reading {
-	if len(data) < 1 {
-		return nil
-	}
-	return []handler.Reading{
-		{
-			SensorMAC:  obj.MAC,
-			SensorName: obj.Name,
-			Type:       "raw",
-			Value:      float64(data[0]),
-			Unit:       "",
-			Timestamp:  t,
-			Data:       data,
-		},
-	}
 }
 
 func (s *Scanner) Close() error {
