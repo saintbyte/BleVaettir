@@ -2,8 +2,8 @@ package scanner
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"github.com/pkg/errors"
 	"log/slog"
 	"time"
 
@@ -20,6 +20,12 @@ type Scanner struct {
 	unknownHandlers []handler.Handler
 	objectMap       map[string]*config.BLEObjectConfig
 	hciID           int
+	scanResults     []scanResult
+}
+
+type scanResult struct {
+	mac string
+	adv ble.Advertisement
 }
 
 func New(cfg *config.Config, objectHandlers map[string][]handler.Handler, unknownHandlers []handler.Handler) (*Scanner, error) {
@@ -35,6 +41,7 @@ func New(cfg *config.Config, objectHandlers map[string][]handler.Handler, unknow
 		unknownHandlers: unknownHandlers,
 		objectMap:       make(map[string]*config.BLEObjectConfig),
 		hciID:           cfg.BLE.HCI,
+		scanResults:     make([]scanResult, 0, 100),
 	}
 
 	for i := range cfg.BLEObjects {
@@ -51,9 +58,7 @@ func (s *Scanner) Run(stop <-chan struct{}) {
 	scanInterval := time.Duration(s.cfg.Intervals.ScanIntervalSec) * time.Second
 	ticker := time.NewTicker(scanInterval)
 	defer ticker.Stop()
-
 	s.scan()
-
 	for {
 		select {
 		case <-stop:
@@ -63,42 +68,45 @@ func (s *Scanner) Run(stop <-chan struct{}) {
 		}
 	}
 }
-func (s *Scanner) advHandler(a ble.Advertisement) {
-	mac := a.Addr().String()
-	if obj, ok := s.objectMap[mac]; ok {
-		s.handleObject(a, obj)
-	} else if len(s.unknownHandlers) > 0 {
-		s.handleUnknown(a, mac)
-	}
-}
-
-func (s *Scanner) chkErr(err error) {
-	switch errors.Cause(err) {
-	case nil:
-		s.scanDone() // Todo
-	case context.DeadlineExceeded:
-		s.scanDone()
-	case context.Canceled:
-		s.scanCanceled()
-	default:
-		slog.Warn("BLE scan error", "error", err)
-	}
-}
-
-func (s *Scanner) scanDone() {
-	slog.Debug("Done scanning BLE devices.")
-	ble.Stop()
-}
-
-func (s *Scanner) scanCanceled() {
-	slog.Debug("Canelled scanning BLE devices.")
-	ble.Stop()
-}
-
 func (s *Scanner) scan() {
-	ctx := ble.WithSigHandler(context.WithTimeout(context.Background(), time.Duration(s.cfg.Intervals.ScanDurationSec)*time.Second))
-	defer ble.Stop()
-	s.chkErr(ble.Scan(ctx, false, s.advHandler, nil))
+	s.scanResults = s.scanResults[:0]
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(s.cfg.Intervals.ScanDurationSec)*time.Second)
+	defer cancel()
+
+	err := ble.Scan(ctx, false, func(a ble.Advertisement) {
+		s.scanResults = append(s.scanResults, scanResult{
+			mac: a.Addr().String(),
+			adv: a,
+		})
+	}, nil)
+
+	if err != nil {
+		switch {
+		case errors.Is(err, context.Canceled):
+			break
+		case errors.Is(err, context.DeadlineExceeded):
+			break
+		default:
+			slog.Warn("BLE scan error", "error", err)
+		}
+	}
+
+	s.processResults()
+}
+
+func (s *Scanner) processResults() {
+	slog.Debug("Processing scan results", "count", len(s.scanResults))
+
+	seenUnknown := make(map[string]bool)
+	for _, r := range s.scanResults {
+		if obj, ok := s.objectMap[r.mac]; ok {
+			s.handleObject(r.adv, obj)
+		} else if !seenUnknown[r.mac] && len(s.unknownHandlers) > 0 {
+			s.handleUnknown(r.adv, r.mac)
+			seenUnknown[r.mac] = true
+		}
+	}
 }
 
 func (s *Scanner) handleObject(a ble.Advertisement, obj *config.BLEObjectConfig) {

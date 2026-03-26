@@ -146,7 +146,7 @@ func buildGlobalHandlers(handlerCfgs []config.HandlerConfig, store *storage.Stor
 			}
 		case "narodmon":
 			if h.Narodmon != nil && h.Narodmon.Enabled {
-				handlers = append(handlers, handler.NewNarodmonHandler(h.Narodmon.Endpoint, h.Narodmon.DeviceID, h.Narodmon.DeviceMAC))
+				handlers = append(handlers, handler.NewNarodmonHandler())
 			}
 		case "log":
 			handlers = append(handlers, handler.NewLogHandler())
