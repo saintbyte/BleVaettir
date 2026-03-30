@@ -54,8 +54,10 @@ func New(cfg *config.Config, objectHandlers map[string][]handler.Handler, unknow
 
 func (s *Scanner) Run(stop <-chan struct{}) {
 	slog.Info("BLE scanner started", "hci", s.hciID, "objects", len(s.cfg.BLEObjects))
-
-	scanInterval := time.Duration(s.cfg.Intervals.ScanIntervalSec) * time.Second
+	// Время между сканировани: время сканирования + время между сканирования - потому что так понятнее
+	scanInterval := time.Duration(
+		s.cfg.Intervals.ScanIntervalSec+s.cfg.Intervals.ScanDurationSec,
+	) * time.Second
 	ticker := time.NewTicker(scanInterval)
 	defer ticker.Stop()
 	s.scan()

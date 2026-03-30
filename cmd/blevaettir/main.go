@@ -150,6 +150,8 @@ func buildGlobalHandlers(handlerCfgs []config.HandlerConfig, store *storage.Stor
 			}
 		case "log":
 			handlers = append(handlers, handler.NewLogHandler())
+		case "datacake":
+			handlers = append(handlers, handler.NewDataCakeHandler())
 		}
 	}
 
