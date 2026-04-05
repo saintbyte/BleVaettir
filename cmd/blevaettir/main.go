@@ -104,101 +104,190 @@ func daemonize() {
 	os.Exit(0)
 }
 
-func buildObjectHandlers(cfg *config.Config, store *storage.Storage) (map[string][]handler.Handler, []handler.Handler) {
-	result := make(map[string][]handler.Handler)
+func buildObjectHandlers(cfg *config.Config, store *storage.Storage) (map[string][]scanner.HandlerWithConfig, []scanner.HandlerWithConfig) {
+	result := make(map[string][]scanner.HandlerWithConfig)
 	globalHandlers := buildGlobalHandlers(cfg.Handlers, store)
-	handlerMap := buildHandlerMap(cfg.Handlers, store)
-	unknownHandlers := buildUnknownHandlers(cfg.UnknownObjects, handlerMap, store)
+	handlerFactoryMap := buildHandlerFactoryMap(store)
+	unknownHandlers := buildUnknownHandlers(cfg.UnknownObjects, handlerFactoryMap)
 
 	for _, obj := range cfg.BLEObjects {
 		if len(obj.Handlers) == 0 {
 			result[obj.MAC] = globalHandlers
 		} else {
-			var objHandlers []handler.Handler
+			var objHandlers []scanner.HandlerWithConfig
 			for _, h := range obj.Handlers {
-				if ih, ok := handlerMap[h.Type]; ok {
-					objHandlers = append(objHandlers, ih)
+				cfg := getHandlerConfig(h, cfg.Handlers)
+				if f, ok := handlerFactoryMap[h.Type]; ok {
+					objHandlers = append(objHandlers, scanner.HandlerWithConfig{
+						Handler: f(),
+						Config:  cfg,
+					})
 				}
 			}
 			result[obj.MAC] = objHandlers
 		}
 
 		if len(result[obj.MAC]) == 0 {
-			result[obj.MAC] = []handler.Handler{handler.NewDBHandler(store)}
+			result[obj.MAC] = []scanner.HandlerWithConfig{
+				{Handler: handler.NewDBHandler(store), Config: nil},
+			}
 		}
 	}
 
 	return result, unknownHandlers
 }
 
-func buildGlobalHandlers(handlerCfgs []config.HandlerConfig, store *storage.Storage) []handler.Handler {
-	var handlers []handler.Handler
+type handlerFactory func() handler.Handler
+
+func buildGlobalHandlers(handlerCfgs []config.HandlerConfig, store *storage.Storage) []scanner.HandlerWithConfig {
+	var handlers []scanner.HandlerWithConfig
 
 	for _, h := range handlerCfgs {
-		switch h.Type {
-		case "db":
-			if h.DB != nil && h.DB.Enabled {
-				handlers = append(handlers, handler.NewDBHandler(store))
-			}
-		case "http":
-			if h.HTTP != nil && h.HTTP.Enabled {
-				handlers = append(handlers, handler.NewHTTPHandler(h.HTTP.Endpoint, h.HTTP.APIKey))
-			}
-		case "narodmon":
-			if h.Narodmon != nil && h.Narodmon.Enabled {
-				handlers = append(handlers, handler.NewNarodmonHandler())
-			}
-		case "log":
-			handlers = append(handlers, handler.NewLogHandler())
-		case "datacake":
-			handlers = append(handlers, handler.NewDataCakeHandler())
+		cfg := getHandlerConfigFromGlobal(h)
+		f := getHandlerFactory(h.Type, store)
+		if f != nil {
+			handlers = append(handlers, scanner.HandlerWithConfig{
+				Handler: f(),
+				Config:  cfg,
+			})
 		}
 	}
 
 	return handlers
 }
 
-func buildHandlerMap(handlerCfgs []config.HandlerConfig, store *storage.Storage) map[string]handler.Handler {
-	result := make(map[string]handler.Handler)
+func buildHandlerFactoryMap(store *storage.Storage) map[string]handlerFactory {
+	return map[string]handlerFactory{
+		"db":       func() handler.Handler { return handler.NewDBHandler(store) },
+		"http":     func() handler.Handler { return handler.NewHTTPHandler() },
+		"narodmon": func() handler.Handler { return handler.NewNarodmonHandler() },
+		"log":      func() handler.Handler { return handler.NewLogHandler() },
+		"datacake": func() handler.Handler { return handler.NewDataCakeHandler() },
+	}
+}
 
-	for _, h := range handlerCfgs {
-		switch h.Type {
-		case "db":
-			if h.DB != nil && h.DB.Enabled {
-				result["db"] = handler.NewDBHandler(store)
+func getHandlerFactory(handlerType string, store *storage.Storage) handlerFactory {
+	factories := buildHandlerFactoryMap(store)
+	return factories[handlerType]
+}
+
+func getHandlerConfig(objH config.ObjectHandler, globalCfgs []config.HandlerConfig) *handler.HandlerConfig {
+	var cfg handler.HandlerConfig
+
+	switch objH.Type {
+	case "db":
+		if objH.DB != nil {
+			cfg.DB = &handler.DBHandlerConfig{Enabled: objH.DB.Enabled}
+		}
+	case "http":
+		if objH.HTTP != nil {
+			cfg.HTTP = &handler.HTTPHandlerConfig{
+				Enabled:  objH.HTTP.Enabled,
+				Endpoint: objH.HTTP.Endpoint,
+				APIKey:   objH.HTTP.APIKey,
 			}
-		case "http":
-			if h.HTTP != nil && h.HTTP.Enabled {
-				result["http"] = handler.NewHTTPHandler(h.HTTP.Endpoint, h.HTTP.APIKey)
+		}
+	case "narodmon":
+		if objH.Narodmon != nil {
+			cfg.Narodmon = &handler.NarodmonHandlerConfig{
+				Enabled:  objH.Narodmon.Enabled,
+				Endpoint: objH.Narodmon.Endpoint,
+				Owner:    objH.Narodmon.Owner,
+				Lat:      objH.Narodmon.Lat,
+				Lon:      objH.Narodmon.Lon,
+				Alt:      objH.Narodmon.Alt,
 			}
-		case "narodmon":
-			if h.Narodmon != nil && h.Narodmon.Enabled {
-				result["narodmon"] = handler.NewNarodmonHandler()
+		}
+	case "log":
+		if objH.Log != nil {
+			cfg.Log = &handler.LogHandlerConfig{Enabled: objH.Log.Enabled}
+		}
+	case "datacake":
+		if objH.DataCake != nil {
+			cfg.DataCake = &handler.DataCakeHandlerConfig{
+				Enabled:  objH.DataCake.Enabled,
+				Endpoint: objH.DataCake.Endpoint,
 			}
-		case "log":
-			result["log"] = handler.NewLogHandler()
 		}
 	}
 
-	return result
+	if !hasConfig(&cfg) {
+		return nil
+	}
+
+	return &cfg
 }
 
-func buildUnknownHandlers(cfg config.UnknownObjectsConfig, handlerMap map[string]handler.Handler, store *storage.Storage) []handler.Handler {
+func getHandlerConfigFromGlobal(h config.HandlerConfig) *handler.HandlerConfig {
+	var cfg handler.HandlerConfig
+
+	switch h.Type {
+	case "db":
+		if h.DB != nil {
+			cfg.DB = &handler.DBHandlerConfig{Enabled: h.DB.Enabled}
+		}
+	case "http":
+		if h.HTTP != nil {
+			cfg.HTTP = &handler.HTTPHandlerConfig{
+				Enabled:  h.HTTP.Enabled,
+				Endpoint: h.HTTP.Endpoint,
+				APIKey:   h.HTTP.APIKey,
+			}
+		}
+	case "narodmon":
+		if h.Narodmon != nil {
+			cfg.Narodmon = &handler.NarodmonHandlerConfig{
+				Enabled:  h.Narodmon.Enabled,
+				Endpoint: h.Narodmon.Endpoint,
+				Owner:    h.Narodmon.Owner,
+				Lat:      h.Narodmon.Lat,
+				Lon:      h.Narodmon.Lon,
+				Alt:      h.Narodmon.Alt,
+			}
+		}
+	case "log":
+		if h.Log != nil {
+			cfg.Log = &handler.LogHandlerConfig{Enabled: h.Log.Enabled}
+		}
+	case "datacake":
+		if h.DataCake != nil {
+			cfg.DataCake = &handler.DataCakeHandlerConfig{
+				Enabled:  h.DataCake.Enabled,
+				Endpoint: h.DataCake.Endpoint,
+			}
+		}
+	}
+
+	if !hasConfig(&cfg) {
+		return nil
+	}
+
+	return &cfg
+}
+
+func hasConfig(cfg *handler.HandlerConfig) bool {
+	return cfg.DB != nil || cfg.HTTP != nil || cfg.Narodmon != nil || cfg.Log != nil || cfg.DataCake != nil
+}
+
+func buildUnknownHandlers(cfg config.UnknownObjectsConfig, handlerFactoryMap map[string]handlerFactory) []scanner.HandlerWithConfig {
 	if !cfg.Enabled || len(cfg.Handlers) == 0 {
 		return nil
 	}
 
-	var handlers []handler.Handler
+	var handlers []scanner.HandlerWithConfig
 	for _, h := range cfg.Handlers {
-		if ih, ok := handlerMap[h.Type]; ok {
-			handlers = append(handlers, ih)
+		if f, ok := handlerFactoryMap[h.Type]; ok {
+			handlers = append(handlers, scanner.HandlerWithConfig{
+				Handler: f(),
+				Config:  nil,
+			})
 		}
 	}
 
 	return handlers
 }
 
-func countHandlers(m map[string][]handler.Handler) int {
+func countHandlers(m map[string][]scanner.HandlerWithConfig) int {
 	total := 0
 	for _, hs := range m {
 		total += len(hs)

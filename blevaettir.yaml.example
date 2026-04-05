@@ -21,6 +21,20 @@ handlers:
       endpoint: "http://localhost:8080/api/sensors"
       api_key: ""
 
+  - type: "narodmon"
+    narodmon:
+      enabled: false
+      endpoint: "http://narodmon.ru/json"
+      owner: "Your Name"
+      lat: "55.7558"
+      lon: "37.6173"
+      alt: "150"
+
+  - type: "datacake"
+    datacake:
+      enabled: false
+      endpoint: "https://api.datacake.co"
+
   - type: "log"
 
 unknown_objects:
@@ -50,3 +64,29 @@ ble_objects:
     handlers:
       - type: "db"
       - type: "http"
+
+  - name: "Custom Sensor"
+    mac: "AA:BB:CC:DD:EE:01"
+    parsers:
+      - type: "atc_thermometer"
+    handlers:
+      - type: "http"
+        http:
+          enabled: true
+          endpoint: "http://custom-endpoint.local/api"
+          api_key: "custom_api_key"
+      - type: "db"
+
+  - name: "Another Sensor"
+    mac: "AA:BB:CC:DD:EE:02"
+    parsers:
+      - type: "xiaomi_lywsd03mmc"
+    handlers:
+      - type: "narodmon"
+        narodmon:
+          enabled: true
+          endpoint: "http://narodmon.ru/json"
+          owner: "Custom Owner"
+          lat: "55.7558"
+          lon: "37.6173"
+          alt: "150"

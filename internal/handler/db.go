@@ -18,7 +18,7 @@ func (h *DBHandler) Name() string {
 	return "db"
 }
 
-func (h *DBHandler) Handle(reading *Reading) error {
+func (h *DBHandler) Handle(reading *Reading, cfg *HandlerConfig) error {
 	r := &storage.Reading{
 		SensorMAC:  reading.SensorMAC,
 		SensorName: reading.SensorName,

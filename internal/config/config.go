@@ -50,7 +50,12 @@ type ParserConfig struct {
 }
 
 type ObjectHandler struct {
-	Type string `yaml:"type"`
+	Type     string                 `yaml:"type"`
+	DB       *DBHandlerConfig       `yaml:"db,omitempty"`
+	HTTP     *HTTPHandlerConfig     `yaml:"http,omitempty"`
+	Narodmon *NarodmonHandlerConfig `yaml:"narodmon,omitempty"`
+	Log      *LogHandlerConfig      `yaml:"log,omitempty"`
+	DataCake *DataCakeHandlerConfig `yaml:"datacake,omitempty"`
 }
 
 type HandlerConfig struct {
@@ -58,14 +63,17 @@ type HandlerConfig struct {
 	DB       *DBHandlerConfig       `yaml:"db,omitempty"`
 	HTTP     *HTTPHandlerConfig     `yaml:"http,omitempty"`
 	Narodmon *NarodmonHandlerConfig `yaml:"narodmon,omitempty"`
+	Log      *LogHandlerConfig      `yaml:"log,omitempty"`
+	DataCake *DataCakeHandlerConfig `yaml:"datacake,omitempty"`
 }
 
 type NarodmonHandlerConfig struct {
-	Enabled bool   `yaml:"enabled"`
-	Owner   string `yaml:"owner"`
-	Lat     string `yaml:"lat"`
-	Lon     string `yaml:"lon"`
-	Alt     string `yaml:"alt"`
+	Enabled  bool   `yaml:"enabled"`
+	Endpoint string `yaml:"endpoint"`
+	Owner    string `yaml:"owner"`
+	Lat      string `yaml:"lat"`
+	Lon      string `yaml:"lon"`
+	Alt      string `yaml:"alt"`
 }
 
 type DBHandlerConfig struct {
@@ -76,6 +84,15 @@ type HTTPHandlerConfig struct {
 	Enabled  bool   `yaml:"enabled"`
 	Endpoint string `yaml:"endpoint"`
 	APIKey   string `yaml:"api_key"`
+}
+
+type DataCakeHandlerConfig struct {
+	Enabled  bool   `yaml:"enabled"`
+	Endpoint string `yaml:"endpoint"`
+}
+
+type LogHandlerConfig struct {
+	Enabled bool `yaml:"enabled"`
 }
 
 func Load(path string) (*Config, error) {

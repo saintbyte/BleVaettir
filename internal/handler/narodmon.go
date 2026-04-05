@@ -46,7 +46,11 @@ func (h *NarodmonHandler) Name() string {
 	return "narodmon"
 }
 
-func (h *NarodmonHandler) Handle(reading *Reading) error {
+func (h *NarodmonHandler) Handle(reading *Reading, cfg *HandlerConfig) error {
+	if cfg.Narodmon == nil || !cfg.Narodmon.Enabled {
+		return nil
+	}
+
 	payload := []NarodmonDevice{}
 
 	body, err := json.Marshal(payload)
@@ -54,7 +58,7 @@ func (h *NarodmonHandler) Handle(reading *Reading) error {
 		return err
 	}
 
-	req, err := http.NewRequest("POST", "http://narodmon.ru/json", bytes.NewReader(body))
+	req, err := http.NewRequest("POST", cfg.Narodmon.Endpoint, bytes.NewReader(body))
 	if err != nil {
 		return err
 	}

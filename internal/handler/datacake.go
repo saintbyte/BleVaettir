@@ -10,8 +10,7 @@ import (
 )
 
 type DataCakeHandler struct {
-	client   *http.Client
-	endpoint string
+	client *http.Client
 }
 
 type DataCakePayload struct {
@@ -28,7 +27,6 @@ func NewDataCakeHandler() *DataCakeHandler {
 		client: &http.Client{
 			Timeout: 30 * time.Second,
 		},
-		endpoint: "",
 	}
 }
 
@@ -36,7 +34,11 @@ func (h *DataCakeHandler) Name() string {
 	return "datacake"
 }
 
-func (h *DataCakeHandler) Handle(reading *Reading) error {
+func (h *DataCakeHandler) Handle(reading *Reading, cfg *HandlerConfig) error {
+	if cfg.DataCake == nil || !cfg.DataCake.Enabled {
+		return nil
+	}
+
 	payload := []HTTPPayload{
 		{
 			SensorMAC:  reading.SensorMAC,
@@ -53,19 +55,16 @@ func (h *DataCakeHandler) Handle(reading *Reading) error {
 		return err
 	}
 
-	req, err := http.NewRequest(http.MethodPost, h.endpoint, bytes.NewReader(body))
+	req, err := http.NewRequest(http.MethodPost, cfg.DataCake.Endpoint, bytes.NewReader(body))
 	if err != nil {
 		return err
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	//if h.apiKey != "" {
-	//	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", h.apiKey))
-	//}
 
 	resp, err := h.client.Do(req)
 	if err != nil {
-		slog.Warn("http handler: failed to send", "error", err, "endpoint", h.endpoint)
+		slog.Warn("datacake handler: failed to send", "error", err, "endpoint", cfg.DataCake.Endpoint)
 		return err
 	}
 	defer resp.Body.Close()
@@ -74,5 +73,5 @@ func (h *DataCakeHandler) Handle(reading *Reading) error {
 		return nil
 	}
 
-	return fmt.Errorf("http handler: server returned status %d", resp.StatusCode)
+	return fmt.Errorf("datacake handler: server returned status %d", resp.StatusCode)
 }

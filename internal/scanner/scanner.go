@@ -16,11 +16,16 @@ import (
 
 type Scanner struct {
 	cfg             *config.Config
-	objectHandlers  map[string][]handler.Handler
-	unknownHandlers []handler.Handler
+	objectHandlers  map[string][]HandlerWithConfig
+	unknownHandlers []HandlerWithConfig
 	objectMap       map[string]*config.BLEObjectConfig
 	hciID           int
 	scanResults     []scanResult
+}
+
+type HandlerWithConfig struct {
+	Handler handler.Handler
+	Config  *handler.HandlerConfig
 }
 
 type scanResult struct {
@@ -28,7 +33,7 @@ type scanResult struct {
 	adv ble.Advertisement
 }
 
-func New(cfg *config.Config, objectHandlers map[string][]handler.Handler, unknownHandlers []handler.Handler) (*Scanner, error) {
+func New(cfg *config.Config, objectHandlers map[string][]HandlerWithConfig, unknownHandlers []HandlerWithConfig) (*Scanner, error) {
 	dev, err := linux.NewDevice(ble.OptDeviceID(cfg.BLE.HCI))
 	if err != nil {
 		return nil, fmt.Errorf("failed to open HCI%d: %w", cfg.BLE.HCI, err)
@@ -117,15 +122,20 @@ func (s *Scanner) handleObject(a ble.Advertisement, obj *config.BLEObjectConfig)
 
 	for _, r := range readings {
 		for _, h := range handlers {
-			if err := h.Handle(&r); err != nil {
+			if err := h.Handler.Handle(&r, h.Config); err != nil {
 				slog.Warn("handler failed",
-					"handler", h.Name(),
+					"handler", h.Handler.Name(),
 					"sensor", obj.Name,
 					"error", err,
 				)
 			}
 		}
 	}
+	s.AfterHandleAllObject()
+}
+
+func (s *Scanner) AfterHandleAllObject() {
+	slog.Warn("halder all")
 }
 
 func (s *Scanner) handleUnknown(a ble.Advertisement, mac string) {
@@ -142,9 +152,9 @@ func (s *Scanner) handleUnknown(a ble.Advertisement, mac string) {
 	}
 
 	for _, h := range s.unknownHandlers {
-		if err := h.Handle(&r); err != nil {
+		if err := h.Handler.Handle(&r, h.Config); err != nil {
 			slog.Warn("unknown handler failed",
-				"handler", h.Name(),
+				"handler", h.Handler.Name(),
 				"mac", mac,
 				"error", err,
 			)

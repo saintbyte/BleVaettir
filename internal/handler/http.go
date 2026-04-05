@@ -10,9 +10,7 @@ import (
 )
 
 type HTTPHandler struct {
-	client   *http.Client
-	endpoint string
-	apiKey   string
+	client *http.Client
 }
 
 type HTTPPayload struct {
@@ -24,13 +22,11 @@ type HTTPPayload struct {
 	Timestamp  string  `json:"timestamp"`
 }
 
-func NewHTTPHandler(endpoint, apiKey string) *HTTPHandler {
+func NewHTTPHandler() *HTTPHandler {
 	return &HTTPHandler{
 		client: &http.Client{
 			Timeout: 30 * time.Second,
 		},
-		endpoint: endpoint,
-		apiKey:   apiKey,
 	}
 }
 
@@ -38,7 +34,11 @@ func (h *HTTPHandler) Name() string {
 	return "http"
 }
 
-func (h *HTTPHandler) Handle(reading *Reading) error {
+func (h *HTTPHandler) Handle(reading *Reading, cfg *HandlerConfig) error {
+	if cfg.HTTP == nil || !cfg.HTTP.Enabled {
+		return nil
+	}
+
 	payload := []HTTPPayload{
 		{
 			SensorMAC:  reading.SensorMAC,
@@ -55,19 +55,19 @@ func (h *HTTPHandler) Handle(reading *Reading) error {
 		return err
 	}
 
-	req, err := http.NewRequest(http.MethodPost, h.endpoint, bytes.NewReader(body))
+	req, err := http.NewRequest(http.MethodPost, cfg.HTTP.Endpoint, bytes.NewReader(body))
 	if err != nil {
 		return err
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	if h.apiKey != "" {
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", h.apiKey))
+	if cfg.HTTP.APIKey != "" {
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", cfg.HTTP.APIKey))
 	}
 
 	resp, err := h.client.Do(req)
 	if err != nil {
-		slog.Warn("http handler: failed to send", "error", err, "endpoint", h.endpoint)
+		slog.Warn("http handler: failed to send", "error", err, "endpoint", cfg.HTTP.Endpoint)
 		return err
 	}
 	defer resp.Body.Close()

@@ -14,7 +14,7 @@ func (h *LogHandler) Name() string {
 	return "log"
 }
 
-func (h *LogHandler) Handle(reading *Reading) error {
+func (h *LogHandler) Handle(reading *Reading, cfg *HandlerConfig) error {
 	slog.Info("sensor reading",
 		"mac", reading.SensorMAC,
 		"name", reading.SensorName,
