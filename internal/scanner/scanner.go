@@ -114,6 +114,7 @@ func (s *Scanner) processResults() {
 			seenUnknown[r.mac] = true
 		}
 	}
+	s.AfterHandleAll()
 }
 
 func (s *Scanner) handleObject(a ble.Advertisement, obj *config.BLEObjectConfig) {
@@ -131,11 +132,15 @@ func (s *Scanner) handleObject(a ble.Advertisement, obj *config.BLEObjectConfig)
 			}
 		}
 	}
-	s.AfterHandleAllObject()
+	s.AfterHandleAllInObject()
 }
 
-func (s *Scanner) AfterHandleAllObject() {
-	slog.Warn("halder all")
+func (s *Scanner) AfterHandleAllInObject() {
+	slog.Debug("event processed  all in obj")
+}
+
+func (s *Scanner) AfterHandleAll() {
+	slog.Debug("event processed all available object")
 }
 
 func (s *Scanner) handleUnknown(a ble.Advertisement, mac string) {
