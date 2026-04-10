@@ -13,9 +13,13 @@ type DBHandlerConfig struct {
 }
 
 type HTTPHandlerConfig struct {
-	Enabled  bool
-	Endpoint string
-	APIKey   string
+	Enabled    bool
+	Endpoint   string
+	APIKey     string
+	CACert     string
+	ClientCert string
+	ClientKey  string
+	SkipVerify *bool
 }
 
 type NarodmonHandlerConfig struct {
@@ -28,8 +32,9 @@ type NarodmonHandlerConfig struct {
 }
 
 type DataCakeHandlerConfig struct {
-	Enabled  bool
-	Endpoint string
+	Enabled    bool
+	Endpoint   string
+	SkipVerify *bool
 }
 
 type LogHandlerConfig struct {

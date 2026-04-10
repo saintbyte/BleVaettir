@@ -81,14 +81,19 @@ type DBHandlerConfig struct {
 }
 
 type HTTPHandlerConfig struct {
-	Enabled  bool   `yaml:"enabled"`
-	Endpoint string `yaml:"endpoint"`
-	APIKey   string `yaml:"api_key"`
+	Enabled    bool   `yaml:"enabled"`
+	Endpoint   string `yaml:"endpoint"`
+	APIKey     string `yaml:"api_key"`
+	CACert     string `yaml:"ca_cert"`
+	ClientCert string `yaml:"client_cert"`
+	ClientKey  string `yaml:"client_key"`
+	SkipVerify bool   `yaml:"skip_verify"`
 }
 
 type DataCakeHandlerConfig struct {
-	Enabled  bool   `yaml:"enabled"`
-	Endpoint string `yaml:"endpoint"`
+	Enabled    bool   `yaml:"enabled"`
+	Endpoint   string `yaml:"endpoint"`
+	SkipVerify bool   `yaml:"skip_verify"`
 }
 
 type LogHandlerConfig struct {

@@ -2,10 +2,13 @@ package handler
 
 import (
 	"bytes"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -30,6 +33,45 @@ func NewHTTPHandler() *HTTPHandler {
 	}
 }
 
+func (h *HTTPHandler) getClient(cfg *HTTPHandlerConfig) *http.Client {
+	if cfg == nil || (cfg.CACert == "" && cfg.ClientCert == "" && !*cfg.SkipVerify) {
+		return h.client
+	}
+
+	tlsConfig := &tls.Config{}
+
+	if *cfg.SkipVerify {
+		tlsConfig.InsecureSkipVerify = true
+	}
+
+	if cfg.CACert != "" {
+		caCert, err := os.ReadFile(cfg.CACert)
+		if err != nil {
+			slog.Error("http handler: failed to read CA cert", "error", err, "path", cfg.CACert)
+		} else {
+			caCertPool := x509.NewCertPool()
+			caCertPool.AppendCertsFromPEM(caCert)
+			tlsConfig.RootCAs = caCertPool
+		}
+	}
+
+	if cfg.ClientCert != "" && cfg.ClientKey != "" {
+		cert, err := tls.LoadX509KeyPair(cfg.ClientCert, cfg.ClientKey)
+		if err != nil {
+			slog.Error("http handler: failed to load client cert", "error", err)
+		} else {
+			tlsConfig.Certificates = []tls.Certificate{cert}
+		}
+	}
+
+	return &http.Client{
+		Timeout: 30 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: tlsConfig,
+		},
+	}
+}
+
 func (h *HTTPHandler) Name() string {
 	return "http"
 }
@@ -39,17 +81,10 @@ func (h *HTTPHandler) Handle(reading *Reading, cfg *HandlerConfig) error {
 		return nil
 	}
 
-	payload := []HTTPPayload{
-		{
-			SensorMAC:  reading.SensorMAC,
-			SensorName: reading.SensorName,
-			Type:       reading.Type,
-			Value:      reading.Value,
-			Unit:       reading.Unit,
-			Timestamp:  reading.Timestamp.Format(time.RFC3339),
-		},
+	payload := map[string]any{
+		"device": reading.SensorMAC,
 	}
-
+	payload[reading.Type] = reading.Value
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return err
@@ -65,7 +100,7 @@ func (h *HTTPHandler) Handle(reading *Reading, cfg *HandlerConfig) error {
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", cfg.HTTP.APIKey))
 	}
 
-	resp, err := h.client.Do(req)
+	resp, err := h.getClient(cfg.HTTP).Do(req)
 	if err != nil {
 		slog.Warn("http handler: failed to send", "error", err, "endpoint", cfg.HTTP.Endpoint)
 		return err

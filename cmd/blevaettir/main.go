@@ -182,9 +182,13 @@ func getHandlerConfig(objH config.ObjectHandler, globalCfgs []config.HandlerConf
 	case "http":
 		if objH.HTTP != nil {
 			cfg.HTTP = &handler.HTTPHandlerConfig{
-				Enabled:  objH.HTTP.Enabled,
-				Endpoint: objH.HTTP.Endpoint,
-				APIKey:   objH.HTTP.APIKey,
+				Enabled:    objH.HTTP.Enabled,
+				Endpoint:   objH.HTTP.Endpoint,
+				APIKey:     objH.HTTP.APIKey,
+				CACert:     objH.HTTP.CACert,
+				ClientCert: objH.HTTP.ClientCert,
+				ClientKey:  objH.HTTP.ClientKey,
+				SkipVerify: &objH.HTTP.SkipVerify,
 			}
 		}
 	case "narodmon":
@@ -205,8 +209,9 @@ func getHandlerConfig(objH config.ObjectHandler, globalCfgs []config.HandlerConf
 	case "datacake":
 		if objH.DataCake != nil {
 			cfg.DataCake = &handler.DataCakeHandlerConfig{
-				Enabled:  objH.DataCake.Enabled,
-				Endpoint: objH.DataCake.Endpoint,
+				Enabled:    objH.DataCake.Enabled,
+				Endpoint:   objH.DataCake.Endpoint,
+				SkipVerify: &objH.DataCake.SkipVerify,
 			}
 		}
 	}

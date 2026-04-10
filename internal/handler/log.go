@@ -21,6 +21,7 @@ func (h *LogHandler) Handle(reading *Reading, cfg *HandlerConfig) error {
 		"type", reading.Type,
 		"value", reading.Value,
 		"unit", reading.Unit,
+		"handle", h.Name(),
 		"data", string(reading.Data[:]),
 	)
 	return nil
