@@ -59,9 +59,7 @@ func (h *DataCakeHandler) Handle(reading *Reading, cfg *HandlerConfig) error {
 	payload := DataCakePayload{
 		"device": reading.SensorMAC,
 	}
-	payload["field"] = strings.ToLower(reading.Type)
-	payload["value"] = reading.Value
-	payload["timestamp"] = time.Now().Unix()
+	payload[reading.Type] = reading.Value
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return err
