@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -53,26 +52,24 @@ func (h *DataCakeHandler) getClient(url string, cfg *HandlerConfig) *http.Client
 }
 
 func (h *DataCakeHandler) Handle(reading *Reading, cfg *HandlerConfig) error {
+
 	if cfg.DataCake == nil || !cfg.DataCake.Enabled {
 		return nil
 	}
 	payload := DataCakePayload{
 		"device": reading.SensorMAC,
 	}
+	slog.Info("🎂 DataCake Handler Endpoint:", cfg.DataCake.Endpoint)
 	payload[reading.Type] = reading.Value
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return err
 	}
-	slog.Info(cfg.DataCake.Endpoint)
-	slog.Info(string(body))
 	req, err := http.NewRequest(http.MethodPost, cfg.DataCake.Endpoint, bytes.NewReader(body))
 	if err != nil {
 		return err
 	}
-
 	req.Header.Set("Content-Type", "application/json")
-
 	client := h.getClient(cfg.DataCake.Endpoint, cfg)
 	resp, err := client.Do(req)
 	if err != nil {
@@ -80,8 +77,6 @@ func (h *DataCakeHandler) Handle(reading *Reading, cfg *HandlerConfig) error {
 		return err
 	}
 	defer resp.Body.Close()
-	bodyBytes, _ := io.ReadAll(resp.Body)
-	slog.Info("DataCakes Response:", string(bodyBytes))
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		return nil
 	}

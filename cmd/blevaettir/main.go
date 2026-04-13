@@ -48,8 +48,6 @@ func main() {
 		slog.Error("failed to init scanner", "error", err)
 		os.Exit(1)
 	}
-	defer sc.Close()
-
 	stop := make(chan struct{})
 	go sc.Run(stop)
 
@@ -185,9 +183,6 @@ func getHandlerConfig(objH config.ObjectHandler, globalCfgs []config.HandlerConf
 				Enabled:    objH.HTTP.Enabled,
 				Endpoint:   objH.HTTP.Endpoint,
 				APIKey:     objH.HTTP.APIKey,
-				CACert:     objH.HTTP.CACert,
-				ClientCert: objH.HTTP.ClientCert,
-				ClientKey:  objH.HTTP.ClientKey,
 				SkipVerify: &objH.HTTP.SkipVerify,
 			}
 		}

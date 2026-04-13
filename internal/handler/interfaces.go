@@ -16,9 +16,6 @@ type HTTPHandlerConfig struct {
 	Enabled    bool
 	Endpoint   string
 	APIKey     string
-	CACert     string
-	ClientCert string
-	ClientKey  string
 	SkipVerify *bool
 }
 

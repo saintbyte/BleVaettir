@@ -3,12 +3,10 @@ package handler
 import (
 	"bytes"
 	"crypto/tls"
-	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
-	"os"
 	"time"
 )
 
@@ -34,7 +32,7 @@ func NewHTTPHandler() *HTTPHandler {
 }
 
 func (h *HTTPHandler) getClient(cfg *HTTPHandlerConfig) *http.Client {
-	if cfg == nil || (cfg.CACert == "" && cfg.ClientCert == "" && !*cfg.SkipVerify) {
+	if cfg == nil || !*cfg.SkipVerify {
 		return h.client
 	}
 
@@ -42,26 +40,6 @@ func (h *HTTPHandler) getClient(cfg *HTTPHandlerConfig) *http.Client {
 
 	if *cfg.SkipVerify {
 		tlsConfig.InsecureSkipVerify = true
-	}
-
-	if cfg.CACert != "" {
-		caCert, err := os.ReadFile(cfg.CACert)
-		if err != nil {
-			slog.Error("http handler: failed to read CA cert", "error", err, "path", cfg.CACert)
-		} else {
-			caCertPool := x509.NewCertPool()
-			caCertPool.AppendCertsFromPEM(caCert)
-			tlsConfig.RootCAs = caCertPool
-		}
-	}
-
-	if cfg.ClientCert != "" && cfg.ClientKey != "" {
-		cert, err := tls.LoadX509KeyPair(cfg.ClientCert, cfg.ClientKey)
-		if err != nil {
-			slog.Error("http handler: failed to load client cert", "error", err)
-		} else {
-			tlsConfig.Certificates = []tls.Certificate{cert}
-		}
 	}
 
 	return &http.Client{

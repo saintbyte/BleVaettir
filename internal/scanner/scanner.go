@@ -21,16 +21,7 @@ type Scanner struct {
 	objectMap       map[string]*config.BLEObjectConfig
 	hciID           int
 	scanResults     []scanResult
-}
-
-type HandlerWithConfig struct {
-	Handler handler.Handler
-	Config  *handler.HandlerConfig
-}
-
-type scanResult struct {
-	mac string
-	adv ble.Advertisement
+	scope           Scope
 }
 
 func New(cfg *config.Config, objectHandlers map[string][]HandlerWithConfig, unknownHandlers []HandlerWithConfig) (*Scanner, error) {
@@ -47,6 +38,7 @@ func New(cfg *config.Config, objectHandlers map[string][]HandlerWithConfig, unkn
 		objectMap:       make(map[string]*config.BLEObjectConfig),
 		hciID:           cfg.BLE.HCI,
 		scanResults:     make([]scanResult, 0, 100),
+		scope:           make(map[string]DeviceScope, 5),
 	}
 
 	for i := range cfg.BLEObjects {
@@ -91,14 +83,12 @@ func (s *Scanner) scan() {
 	if err != nil {
 		switch {
 		case errors.Is(err, context.Canceled):
-			break
 		case errors.Is(err, context.DeadlineExceeded):
-			break
 		default:
 			slog.Warn("BLE scan error", "error", err)
 		}
 	}
-
+	s.Close()
 	s.processResults()
 }
 
@@ -117,7 +107,10 @@ func (s *Scanner) processResults() {
 	s.AfterHandleAll()
 }
 
-func (s *Scanner) handleObject(a ble.Advertisement, obj *config.BLEObjectConfig) {
+func (s *Scanner) handleObject(
+	a ble.Advertisement,
+	obj *config.BLEObjectConfig,
+) {
 	readings := s.parseAdvertisement(a, obj)
 	handlers := s.objectHandlers[obj.MAC]
 
@@ -136,11 +129,11 @@ func (s *Scanner) handleObject(a ble.Advertisement, obj *config.BLEObjectConfig)
 }
 
 func (s *Scanner) AfterHandleAllInObject() {
-	slog.Debug("event processed  all in obj")
+	slog.Info("event processed  all in obj")
 }
 
 func (s *Scanner) AfterHandleAll() {
-	slog.Debug("event processed all available object")
+	slog.Info("event processed all available object")
 }
 
 func (s *Scanner) handleUnknown(a ble.Advertisement, mac string) {

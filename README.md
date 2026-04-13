@@ -8,6 +8,7 @@ BLE сенсорный демон для Linux. Собирает данные с
 - [Конфигурация](#конфигурация)
 - [Запуск](#запуск)
 - [BLE объекты](#ble-объекты)
+- [Парсеры](#парсеры)
 - [Обработчики (handlers)](#обработчики-handlers)
 - [Неизвестные устройства](#неизвестные-устройства)
 - [Сборка](#сборка)
@@ -47,7 +48,7 @@ make build
 
 ## Конфигурация
 
-Конфигурация хранится в YAML файле.
+Конфигурация хранится в YAML файле. Полный пример: [`blevaettir.yaml.example`](./blevaettir.yaml.example)
 
 ### Структура конфига
 
@@ -59,21 +60,39 @@ storage:
   path: "/var/lib/blevaettir/data.db"  # Путь к SQLite базе
 
 intervals:
+  scan_duration_sec: 5      # Длительность одного сканирования (секунды)
   scan_interval_sec: 30     # Интервал между сканированиями (секунды)
 
 log:
   level: "info"             # Уровень логирования: debug, info, warn, error
 
-handlers:                   # Глобальные обработчики
-  - type: "db"             # Обязательно: сохранение в БД
+handlers:                   # Глобальные обработчики (применяются к объектам без собственных)
+  - type: "db"
     db:
       enabled: true
-  - type: "http"           # Опционально: отправка по HTTP
+  - type: "http"
     http:
       enabled: false
       endpoint: "http://localhost:8080/api/sensors"
       api_key: ""
-  - type: "log"           # Опционально: логирование
+      ca_cert: ""           # Путь к CA сертификату (опционально)
+      client_cert: ""        # Путь к клиентскому сертификату (опционально)
+      client_key: ""         # Путь к ключу клиента (опционально)
+      skip_verify: false     # Пропустить проверку TLS (не рекомендуется)
+  - type: "log"
+  - type: "narodmon"
+    narodmon:
+      enabled: false
+      endpoint: "http://narodmon.ru/json"
+      owner: "Your Name"
+      lat: "55.7558"
+      lon: "37.6173"
+      alt: "150"
+  - type: "datacake"
+    datacake:
+      enabled: false
+      endpoint: "https://api.datacake.co"
+      skip_verify: false
 
 unknown_objects:
   enabled: true             # Обрабатывать неизвестные устройства
@@ -89,9 +108,30 @@ ble_objects:                # Список отслеживаемых BLE уст
       - type: "db"
 ```
 
-### Полный пример конфига
+### Параметры секции `ble`
 
-См. [`blevaettir.yaml.example`](./blevaettir.yaml.example)
+| Параметр | Тип | Описание | По умолчанию |
+|----------|-----|----------|--------------|
+| `hci` | int | HCI интерфейс Bluetooth | `0` |
+
+### Параметры секции `storage`
+
+| Параметр | Тип | Описание | По умолчанию |
+|----------|-----|----------|--------------|
+| `path` | string | Путь к SQLite базе данных | `""` |
+
+### Параметры секции `intervals`
+
+| Параметр | Тип | Описание | По умолчанию |
+|----------|-----|----------|--------------|
+| `scan_duration_sec` | int | Длительность одного сканирования (сек) | `5` |
+| `scan_interval_sec` | int | Интервал между сканированиями (сек) | `30` |
+
+### Параметры секции `log`
+
+| Параметр | Тип | Описание | По умолчанию |
+|----------|-----|----------|--------------|
+| `level` | string | Уровень логирования: debug, info, warn, error | `info` |
 
 ## Запуск
 
@@ -130,20 +170,33 @@ ble_objects:
       - type: "xiaomi_lywsd03mmc"
     handlers:                   # Собственные обработчики (опционально)
       - type: "db"
+        db:
+          enabled: true
 ```
 
-### Парсеры (parsers)
+### Параметры объекта
+
+| Параметр | Тип | Обязательный | Описание |
+|----------|-----|--------------|----------|
+| `name` | string | Да | Человеческое имя устройства |
+| `mac` | string | Да | MAC адрес устройства |
+| `parsers` | []object | Да | Список парсеров |
+| `handlers` | []object | Нет | Собственные обработчики (если указаны, глобальные игнорируются) |
+
+## Парсеры
 
 Парсер определяет формат данных из advertisement пакета.
+
+### Типы парсеров
 
 | Тип | Описание | Данные |
 |-----|----------|--------|
 | `xiaomi_lywsd03mmc` | Xiaomi LYWSD03MMC | temperature, humidity |
 | `atc_thermometer` | ATC/BLE термометры | temperature, humidity |
-| `jaalee` | Jaalée датчика  |  temperature, humidity, battery, rssi |
+| `jaalee` | Jaalee датчики | temperature, humidity, battery, rssi |
 | `raw` | Сырые данные | raw (первый байт) |
 
-#### Xiaomi LYWSD03MMC
+### Xiaomi LYWSD03MMC
 
 ```yaml
 parsers:
@@ -153,7 +206,7 @@ parsers:
 - `temperature` - температура (°C)
 - `humidity` - влажность (%)
 
-#### ATC Thermometer
+### ATC Thermometer
 
 ```yaml
 parsers:
@@ -163,7 +216,7 @@ parsers:
 - `temperature` - температура (°C)
 - `humidity` - влажность (%)
 
-#### Jaalee Thermometer
+### Jaalee Thermometer
 
 ```yaml
 parsers:
@@ -172,11 +225,10 @@ parsers:
 Выводит:
 - `temperature` - температура (°C)
 - `humidity` - влажность (%)
-- `battery` - батарея
-- `rssi` - уровень сигнала
+- `battery` - заряд батареи (%)
+- `rssi` - уровень сигнала (dBm)
 
-
-#### Raw
+### Raw
 
 ```yaml
 parsers:
@@ -185,6 +237,8 @@ parsers:
 Выводит значение первого байта manufacturer data.
 
 ### Множественные парсеры
+
+К одному устройству можно применить несколько парсеров:
 
 ```yaml
 ble_objects:
@@ -201,15 +255,17 @@ ble_objects:
 
 ### Типы обработчиков
 
-| Тип | Описание | Конфиг |
-|-----|----------|---------|
-| `db` | Сохранение в SQLite | `db.enabled: true/false` |
-| `http` | HTTP POST запрос | `http.endpoint`, `http.api_key` |
-| `log` | slog.Info логирование | нет параметров |
+| Тип | Описание |
+|-----|---------|
+| `db` | Сохранение в SQLite |
+| `http` | HTTP POST запрос |
+| `log` | Логирование через slog |
+| `narodmon` | Отправка на Narodmon.ru |
+| `datacake` | Отправка в DataCake |
 
-### Глобальные обработчики
+### Глобальные и объектные обработчики
 
-Применяются ко всем `ble_objects` без собственных обработчиков.
+**Глобальные обработчики** (`handlers`) применяются ко всем устройствам без собственных обработчиков:
 
 ```yaml
 handlers:
@@ -219,7 +275,7 @@ handlers:
   - type: "log"
 ```
 
-### Собственные обработчики объекта
+**Объектные обработчики** переопределяют глобальные для конкретного устройства:
 
 ```yaml
 ble_objects:
@@ -228,13 +284,15 @@ ble_objects:
     parsers:
       - type: "xiaomi_lywsd03mmc"
     handlers:
-      - type: "db"           # Только в БД
-      - type: "log"          # И логировать
+      - type: "db"
+        db:
+          enabled: true
+      - type: "log"
 ```
 
 ### Обработчик DB
 
-Сохранение в SQLite базу.
+Сохранение показаний в SQLite базу.
 
 ```yaml
 handlers:
@@ -243,18 +301,21 @@ handlers:
       enabled: true
 ```
 
-Таблица `readings`:
-- `id` - INTEGER PRIMARY KEY
-- `sensor_mac` - MAC адрес
-- `sensor_name` - Имя из конфига
-- `type` - тип данных (temperature, humidity, raw)
-- `value` - значение
-- `unit` - единица измерения
-- `timestamp` - время
+**Таблица `readings`:**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `id` | INTEGER | PRIMARY KEY |
+| `sensor_mac` | TEXT | MAC адрес |
+| `sensor_name` | TEXT | Имя из конфига |
+| `type` | TEXT | Тип данных (temperature, humidity, raw) |
+| `value` | REAL | Значение |
+| `unit` | TEXT | Единица измерения |
+| `timestamp` | TIMESTAMP | Время измерения |
 
 ### Обработчик HTTP
 
-Отправка данных POST запросом.
+Отправка данных HTTP POST запросом в JSON формате.
 
 ```yaml
 handlers:
@@ -262,10 +323,15 @@ handlers:
     http:
       enabled: true
       endpoint: "http://localhost:8080/api/sensors"
-      api_key: "secret_key"
+      api_key: "secret_key"           # Bearer token (опционально)
+      ca_cert: "/path/to/ca.pem"      # CA сертификат (опционально)
+      client_cert: "/path/to/cert.pem" # Клиентский сертификат (опционально)
+      client_key: "/path/to/key.pem"   # Ключ клиента (опционально)
+      skip_verify: false              # Пропустить проверку TLS
 ```
 
-Формат POST запроса (JSON массив):
+**Формат POST запроса:**
+
 ```json
 [
   {
@@ -279,7 +345,7 @@ handlers:
 ]
 ```
 
-Заголовки:
+**Заголовки:**
 - `Content-Type: application/json`
 - `Authorization: Bearer <api_key>` (если указан)
 
@@ -297,6 +363,54 @@ handlers:
 level=INFO msg="sensor reading" mac=A4:C1:38:12:34:56 name=Kitchen type=temperature value=22.5 unit="°C"
 ```
 
+### Обработчик Narodmon
+
+Отправка данных на сервис [Narodmon.ru](https://narodmon.ru).
+
+```yaml
+handlers:
+  - type: "narodmon"
+    narodmon:
+      enabled: true
+      endpoint: "http://narodmon.ru/json"
+      owner: "Your Name"
+      lat: "55.7558"
+      lon: "37.6173"
+      alt: "150"
+```
+
+**Параметры:**
+
+| Параметр | Тип | Описание |
+|----------|-----|----------|
+| `enabled` | bool | Включить обработчик |
+| `endpoint` | string | URL API Narodmon |
+| `owner` | string | Имя владельца |
+| `lat` | string | Широта |
+| `lon` | string | Долгота |
+| `alt` | string | Высота над уровнем моря |
+
+### Обработчик DataCake
+
+Отправка данных в сервис [DataCake](https://datacake.co).
+
+```yaml
+handlers:
+  - type: "datacake"
+    datacake:
+      enabled: true
+      endpoint: "https://api.datacake.co"
+      skip_verify: false
+```
+
+**Параметры:**
+
+| Параметр | Тип | Описание |
+|----------|-----|----------|
+| `enabled` | bool | Включить обработчик |
+| `endpoint` | string | URL API DataCake |
+| `skip_verify` | bool | Пропустить проверку TLS |
+
 ## Неизвестные устройства
 
 Устройства, обнаруженные при сканировании, но не присутствующие в `ble_objects`.
@@ -306,6 +420,10 @@ unknown_objects:
   enabled: true
   handlers:
     - type: "log"
+    - type: "narodmon"
+      narodmon:
+        enabled: false
+        endpoint: "http://narodmon.com/post"
 ```
 
 При обнаружении отправляют:
@@ -389,6 +507,7 @@ storage:
   path: "/var/lib/blevaettir/data.db"
 
 intervals:
+  scan_duration_sec: 5
   scan_interval_sec: 30
 
 log:
@@ -416,6 +535,7 @@ storage:
   path: "/var/lib/blevaettir/data.db"
 
 intervals:
+  scan_duration_sec: 5
   scan_interval_sec: 30
 
 log:
@@ -473,11 +593,58 @@ level=INFO msg="sensor reading" mac=A4:C1:38:11:11:11 name=Kitchen type=temperat
 level=INFO msg="sensor reading" mac=A4:C1:38:11:11:11 name=Kitchen type=humidity value=65 unit="%"
 ```
 
+### Отправка на Narodmon
+
+```yaml
+ble:
+  hci: 0
+
+storage:
+  path: "/var/lib/blevaettir/data.db"
+
+intervals:
+  scan_duration_sec: 5
+  scan_interval_sec: 30
+
+log:
+  level: "info"
+
+handlers:
+  - type: "narodmon"
+    narodmon:
+      enabled: true
+      endpoint: "http://narodmon.ru/json"
+      owner: "My Home"
+      lat: "55.7558"
+      lon: "37.6173"
+      alt: "150"
+
+ble_objects:
+  - name: "Balcony"
+    mac: "A4:C1:38:AA:BB:CC"
+    parsers:
+      - type: "xiaomi_lywsd03mmc"
+```
+
+### HTTPS с клиентским сертификатом
+
+```yaml
+handlers:
+  - type: "http"
+    http:
+      enabled: true
+      endpoint: "https://secure-api.example.com/sensors"
+      api_key: "my_token"
+      ca_cert: "/etc/blevaettir/ca.pem"
+      client_cert: "/etc/blevaettir/client.pem"
+      client_key: "/etc/blevaettir/client.key"
+```
+
 ## Требования
 
 - Linux с BlueZ
 - Bluetooth адаптер с поддержкой BLE
-- Go 1.22+
+- Go 1.25+
 
 ## Устранение неполадок
 
