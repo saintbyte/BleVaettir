@@ -142,9 +142,27 @@ func parseXiaomiLYWSD(s *Scanner, a ble.Advertisement) []handler.Reading {
 		return nil
 	}
 
-	result, err := XiomiLywsdo3mmcReadSensorData(obj.MAC, 30*time.Second, s.Device())
-	if err != nil {
-		slog.Error("failed to read XiomiLywsdo3mmc sensor data: %v", err)
+	const maxRetries = 2
+	var result XiomiLywsdoSensorData
+	var lastErr error
+
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		result, lastErr = XiomiLywsdo3mmcReadSensorData(obj.MAC, 30*time.Second, s.Device())
+		if lastErr == nil {
+			break
+		}
+		slog.Debug("failed to read XiomiLywsdo3mmc sensor data, retrying",
+			"attempt", attempt, "max", maxRetries, "error", lastErr)
+
+		if attempt < maxRetries {
+			time.Sleep(2 * time.Second)
+		}
+	}
+
+	if lastErr != nil {
+		slog.Error("failed to read XiomiLywsdo3mmc sensor data after retries",
+			"attempts", maxRetries, "error", lastErr)
+		return nil
 	}
 
 	t := time.Now()
