@@ -1,13 +1,20 @@
 package scanner
 
 import (
-	"github.com/saintbyte/BleVaettir/internal/config"
-	"github.com/saintbyte/BleVaettir/internal/handler"
 	"math"
 	"time"
+
+	"github.com/go-ble/ble"
+	"github.com/saintbyte/BleVaettir/internal/handler"
 )
 
-func parseJaalee(data []byte, obj *config.BLEObjectConfig, t time.Time) []handler.Reading {
+func parseJaalee(s *Scanner, a ble.Advertisement) []handler.Reading {
+	data := a.ManufacturerData()
+	obj := s.objectMap[a.Addr().String()]
+	if obj == nil {
+		return nil
+	}
+	t := time.Now()
 	if len(data) < 26 {
 		return nil
 	}

@@ -3,7 +3,7 @@ package scanner
 import (
 	"context"
 	"errors"
-	"fmt"
+	"github.com/go-ble/ble/linux"
 	"log/slog"
 	"time"
 
@@ -11,7 +11,6 @@ import (
 	"github.com/saintbyte/BleVaettir/internal/handler"
 
 	"github.com/go-ble/ble"
-	"github.com/go-ble/ble/linux"
 )
 
 type Scanner struct {
@@ -22,14 +21,10 @@ type Scanner struct {
 	hciID           int
 	scanResults     []scanResult
 	scope           Scope
+	device          *linux.Device
 }
 
 func New(cfg *config.Config, objectHandlers map[string][]HandlerWithConfig, unknownHandlers []HandlerWithConfig) (*Scanner, error) {
-	dev, err := linux.NewDevice(ble.OptDeviceID(cfg.BLE.HCI))
-	if err != nil {
-		return nil, fmt.Errorf("failed to open HCI%d: %w", cfg.BLE.HCI, err)
-	}
-	ble.SetDefaultDevice(dev)
 
 	sc := &Scanner{
 		cfg:             cfg,
@@ -49,14 +44,33 @@ func New(cfg *config.Config, objectHandlers map[string][]HandlerWithConfig, unkn
 	return sc, nil
 }
 
+func (s *Scanner) Close(dev *linux.Device) error {
+	if dev != nil {
+		err := dev.Stop()
+
+		if err != nil {
+			slog.Error("failed to close device", "error", err)
+			return err
+		}
+		dev = nil
+	}
+	return nil
+}
+
 func (s *Scanner) Run(stop <-chan struct{}) {
 	slog.Info("BLE scanner started", "hci", s.hciID, "objects", len(s.cfg.BLEObjects))
-	// Время между сканировани: время сканирования + время между сканирования - потому что так понятнее
+
+	if err := s.OpenDevice(); err != nil {
+		return
+	}
+	defer s.Close(s.device)
+
 	scanInterval := time.Duration(
 		s.cfg.Intervals.ScanIntervalSec+s.cfg.Intervals.ScanDurationSec,
 	) * time.Second
 	ticker := time.NewTicker(scanInterval)
 	defer ticker.Stop()
+
 	s.scan()
 	for {
 		select {
@@ -67,11 +81,26 @@ func (s *Scanner) Run(stop <-chan struct{}) {
 		}
 	}
 }
+
+func (s *Scanner) OpenDevice() error {
+	dev, err := linux.NewDevice(ble.OptDeviceID(s.cfg.BLE.HCI))
+	if err != nil {
+		slog.Error("failed to open HCI%d: %w", s.cfg.BLE.HCI, err)
+		return err
+	}
+	s.device = dev
+	ble.SetDefaultDevice(dev)
+	return nil
+}
+
+func (s *Scanner) Device() *linux.Device {
+	return s.device
+}
+
 func (s *Scanner) scan() {
 	s.scanResults = s.scanResults[:0]
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(s.cfg.Intervals.ScanDurationSec)*time.Second)
-	defer cancel()
 
 	err := ble.Scan(ctx, false, func(a ble.Advertisement) {
 		s.scanResults = append(s.scanResults, scanResult{
@@ -79,6 +108,8 @@ func (s *Scanner) scan() {
 			adv: a,
 		})
 	}, nil)
+
+	cancel()
 
 	if err != nil {
 		switch {
@@ -88,7 +119,6 @@ func (s *Scanner) scan() {
 			slog.Warn("BLE scan error", "error", err)
 		}
 	}
-	s.Close()
 	s.processResults()
 }
 
@@ -162,27 +192,21 @@ func (s *Scanner) handleUnknown(a ble.Advertisement, mac string) {
 
 func (s *Scanner) parseAdvertisement(a ble.Advertisement, obj *config.BLEObjectConfig) []handler.Reading {
 	var readings []handler.Reading
-	now := time.Now()
-	data := a.ManufacturerData()
 
 	for _, parser := range obj.Parsers {
 		switch parser.Type {
 		case "xiaomi_lywsd03mmc":
-			readings = append(readings, parseXiaomiLYWSD(data, obj, now)...)
+			readings = append(readings, parseXiaomiLYWSD(s, a)...)
 		case "atc_thermometer":
-			readings = append(readings, parseATC(data, obj, now)...)
+			readings = append(readings, parseATC(s, a)...)
 		case "jaalee":
-			readings = append(readings, parseJaalee(data, obj, now)...)
+			readings = append(readings, parseJaalee(s, a)...)
 		case "raw":
-			readings = append(readings, parseRaw(data, obj, now)...)
+			readings = append(readings, parseRaw(s, a)...)
 		default:
 			slog.Warn("unknown parser type", "type", parser.Type)
 		}
 	}
 
 	return readings
-}
-
-func (s *Scanner) Close() error {
-	return ble.Stop()
 }

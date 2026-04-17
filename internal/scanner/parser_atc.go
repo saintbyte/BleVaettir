@@ -1,12 +1,19 @@
 package scanner
 
 import (
-	"github.com/saintbyte/BleVaettir/internal/config"
-	"github.com/saintbyte/BleVaettir/internal/handler"
 	"time"
+
+	"github.com/go-ble/ble"
+	"github.com/saintbyte/BleVaettir/internal/handler"
 )
 
-func parseATC(data []byte, obj *config.BLEObjectConfig, t time.Time) []handler.Reading {
+func parseATC(s *Scanner, a ble.Advertisement) []handler.Reading {
+	data := a.ManufacturerData()
+	obj := s.objectMap[a.Addr().String()]
+	if obj == nil {
+		return nil
+	}
+	t := time.Now()
 	if len(data) < 10 {
 		return nil
 	}
