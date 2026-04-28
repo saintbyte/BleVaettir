@@ -14,7 +14,7 @@ BLE сенсорный демон для Linux. Собирает данные с
 - [Сборка](#сборка)
 - [Systemd](#systemd)
 - [Примеры](#примеры)
-
+- [Дополнение](#Дополнение)
 ## Установка
 
 ### Из бинарников
@@ -678,3 +678,7 @@ groups $USER
 sudo usermod -a -G bluetooth $USER
 # Перелогиниться
 ```
+
+
+# Дополнение
+1. [BleVaettirDbPlot](https://github.com/saintbyte/BleVaettirDbPlot) - тулза чтобы строить графики по данным БД
