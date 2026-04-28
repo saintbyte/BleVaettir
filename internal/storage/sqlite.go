@@ -56,10 +56,18 @@ func (s *Storage) migrate() error {
 }
 
 func (s *Storage) Save(reading *Reading) error {
-	_, err := s.db.Exec(`
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(`
 		INSERT INTO readings (sensor_mac, sensor_name, type, value, unit, timestamp)
 		VALUES (?, ?, ?, ?, ?, ?)
 	`, reading.SensorMAC, reading.SensorName, reading.Type, reading.Value, reading.Unit, reading.Timestamp)
+	if err != nil {
+		return err
+	}
+	err = tx.Commit()
 	return err
 }
 
