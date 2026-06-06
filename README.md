@@ -472,6 +472,7 @@ sudo cp bin/linux/amd64/blevaettir /usr/local/bin/
 sudo cp blevaettir.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable blevaettir
+sudo systemctl enable --now blevaettir.timer
 sudo systemctl start blevaettir
 ```
 
@@ -489,6 +490,8 @@ sudo systemctl restart blevaettir
 
 # Остановка
 sudo systemctl stop blevaettir
+
+#
 ```
 
 ### Сервис файл

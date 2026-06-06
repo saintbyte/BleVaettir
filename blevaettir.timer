@@ -1,0 +1,11 @@
+[Unit]
+Description=BleVaettir BLE Sensor Daemon
+Requires=blevaettir.service
+
+[Timer]
+Unit=blevaettir.service
+OnCalendar=*-*-* 03:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
