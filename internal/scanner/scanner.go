@@ -3,8 +3,11 @@ package scanner
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/go-ble/ble/linux"
 	"log/slog"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/saintbyte/BleVaettir/internal/config"
@@ -59,9 +62,16 @@ func (s *Scanner) Close(dev *linux.Device) error {
 
 func (s *Scanner) Run(stop <-chan struct{}) {
 	slog.Info("BLE scanner started", "hci", s.hciID, "objects", len(s.cfg.BLEObjects))
+	err := s.OpenDevice()
 
-	if err := s.OpenDevice(); err != nil {
-		return
+	if err != nil {
+		errstr := fmt.Sprintf(" %v", err)
+		if strings.HasPrefix(errstr, `no such device`) {
+			time.Sleep(1 * time.Minute)
+			os.Exit(1)
+		} else {
+			return
+		}
 	}
 	defer s.Close(s.device)
 
