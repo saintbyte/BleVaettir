@@ -28,7 +28,17 @@ jobs:
           gh release create "${{ github.ref_name }}" \
             --repo "${{ github.repository }}" \
             --title "${{ github.ref_name }}" \
-            --generate-notes \
-            bin/linux/amd64/blevaettir \
-            bin/linux/arm64/blevaettir \
-            bin/linux/386/blevaettir
+            --generate-notes
+
+      - name: Upload Assets
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for f in bin/linux/amd64/blevaettir bin/linux/arm64/blevaettir bin/linux/386/blevaettir; do
+            if [ -f "$f" ]; then
+              echo "Uploading $f..."
+              gh release upload "${{ github.ref_name }}" "$f" --repo "${{ github.repository }}" --clobber
+            else
+              echo "Warning: $f not found, skipping"
+            fi
+          done
