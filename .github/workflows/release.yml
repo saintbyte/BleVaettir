@@ -1,0 +1,46 @@
+name: Release
+
+on:
+  push:
+    branches: [master, main]
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build
+        run: make build
+
+      - name: Calculate next version
+        id: version
+        run: |
+          latest=$(git tag --list 'v*' --sort=-v:refname | head -n1)
+          if [ -z "$latest" ]; then
+            echo "version=v0" >> $GITHUB_OUTPUT
+          else
+            num=${latest#v}
+            next=$((num + 1))
+            echo "version=v$next" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.version.outputs.version }}" \
+            --repo "${{ github.repository }}" \
+            --title "Release ${{ steps.version.outputs.version }}" \
+            --generate-notes \
+            bin/linux/amd64/blevaettir \
+            bin/linux/arm64/blevaettir \
+            bin/linux/386/blevaettir
