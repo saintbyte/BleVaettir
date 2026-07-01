@@ -30,15 +30,26 @@ jobs:
             --title "${{ github.ref_name }}" \
             --generate-notes
 
-      - name: Upload Assets
+      - name: Upload Asset — linux/amd64
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          for f in bin/linux/amd64/blevaettir bin/linux/arm64/blevaettir bin/linux/386/blevaettir; do
-            if [ -f "$f" ]; then
-              echo "Uploading $f..."
-              gh release upload "${{ github.ref_name }}" "$f" --repo "${{ github.repository }}" --clobber
-            else
-              echo "Warning: $f not found, skipping"
-            fi
-          done
+          gh release upload "${{ github.ref_name }}" \
+            "bin/linux/amd64/blevaettir#blevaettir-linux-amd64" \
+            --repo "${{ github.repository }}" --clobber
+
+      - name: Upload Asset — linux/arm64
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ github.ref_name }}" \
+            "bin/linux/arm64/blevaettir#blevaettir-linux-arm64" \
+            --repo "${{ github.repository }}" --clobber
+
+      - name: Upload Asset — linux/386
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ github.ref_name }}" \
+            "bin/linux/386/blevaettir#blevaettir-linux-386" \
+            --repo "${{ github.repository }}" --clobber
