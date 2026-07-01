@@ -37,5 +37,4 @@ bin/
 # Database files
 *.db
 /blevaettir.yaml
-/go.sum
 /blevaettir1.yaml
