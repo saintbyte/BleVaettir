@@ -2,8 +2,7 @@ name: Release
 
 on:
   push:
-    branches: [master, main]
-  workflow_dispatch:
+    tags: [v*]
 
 permissions:
   contents: write
@@ -13,9 +12,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          fetch-tags: true
 
       - uses: actions/setup-go@v5
         with:
@@ -25,25 +21,13 @@ jobs:
       - name: Build
         run: make build
 
-      - name: Calculate next version
-        id: version
-        run: |
-          latest=$(git tag --list 'v*' --sort=-v:refname | head -n1)
-          if [ -z "$latest" ]; then
-            echo "version=v0" >> $GITHUB_OUTPUT
-          else
-            num=${latest#v}
-            next=$((num + 1))
-            echo "version=v$next" >> $GITHUB_OUTPUT
-          fi
-
       - name: Create Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "${{ steps.version.outputs.version }}" \
+          gh release create "${{ github.ref_name }}" \
             --repo "${{ github.repository }}" \
-            --title "Release ${{ steps.version.outputs.version }}" \
+            --title "${{ github.ref_name }}" \
             --generate-notes \
             bin/linux/amd64/blevaettir \
             bin/linux/arm64/blevaettir \
